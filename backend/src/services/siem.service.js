@@ -2,9 +2,12 @@ import { config } from '../config/index.js';
 import { audit } from '../config/db.js';
 import { opensearch, wazuh } from '../services/integration.service.js';
 import * as siemModel from '../models/siem.model.js';
+import { openSearchClient } from '../services/integration.service.js';
 
+// Example usage
+const client = openSearchClient();
 export async function getDashboard(hours) {
-  const result = await opensearch().search({ index: config.eventsIndex, body: {
+  const result = await client.search({ index: config.eventsIndex, body: {
     size: 0,
     query: { range: { '@timestamp': { gte: `now-${hours}h` } } },
     aggs: {

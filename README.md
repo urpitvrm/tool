@@ -40,8 +40,10 @@ PostgreSQL data is retained in the `postgres-data` volume. The frontend Nginx se
 | `OPENSEARCH` | JSON array of one or more OpenSearch node URLs (comma-separated values also accepted) |
 | `OPENSEARCH_USERNAME`, `OPENSEARCH_PASSWORD` | OpenSearch basic authentication |
 | `OPENSEARCH_VERIFY_CERTS` | TLS peer verification; defaults to enabled |
+| `OPENSEARCH_REQUEST_TIMEOUT_MS` | OpenSearch request timeout in milliseconds; defaults to 25000 |
 | `OPENSEARCH_EVENTS_INDEX` | Event index or pattern; defaults to `wazuh-alerts-*` |
 | `MANAGER`, `MANAGER_USERNAME`, `MANAGER_PASSWORD` | Wazuh Manager API connection |
+| `WAZUH_REQUEST_TIMEOUT_MS` | Wazuh authentication and API request timeout in milliseconds; defaults to 30000 |
 | `WAZUH_VERIFY_TLS` | Wazuh TLS peer verification; defaults to enabled. Set to `false` for a self-signed certificate in local development, or set `WAZUH_CA_FILE` to a trusted CA file. |
 | `WAZUH_CA_FILE` | Path to the CA certificate used to verify the Wazuh API certificate |
 | `CORS_ORIGINS` | Comma-separated browser origins |

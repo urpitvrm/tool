@@ -11,6 +11,11 @@ test('TLS certificate validation is enabled unless explicitly disabled', () => {
   assert.equal(typeof config.verifyTls, 'boolean');
 });
 
+test('upstream request timeouts have positive configured defaults', () => {
+  assert.ok(config.opensearchRequestTimeoutMs > 0);
+  assert.ok(config.wazuhRequestTimeoutMs > 0);
+});
+
 test('event index has a configurable non-empty fallback', () => {
   assert.equal(typeof config.eventsIndex, 'string');
   assert.ok(config.eventsIndex.length > 0);

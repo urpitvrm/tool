@@ -1,3 +1,4 @@
+
 import { Client } from '@opensearch-project/opensearch';
 import axios from 'axios';
 import https from 'node:https';
@@ -8,12 +9,6 @@ import { pool } from '../config/db.js';
 // ==================================================
 // TLS CONFIGURATION
 // ==================================================
-
-// Development:
-// Set WAZUH_VERIFY_TLS=false to accept self-signed certificates in development.
-//
-// Production:
-// Set VERIFY_TLS=true and provide the trusted CA certificate.
 
 const wazuhVerifyTls = config.wazuhVerifyTls !== false;
 
@@ -40,11 +35,24 @@ export function opensearch() {
   }
 
   if (!searchClient) {
+    const hasSearchUsername = Boolean(config.searchUsername);
+    const hasSearchPassword = Boolean(config.searchPassword);
+
+    if (hasSearchUsername !== hasSearchPassword) {
+      throw Object.assign(
+        new Error(
+          'Set both OPENSEARCH_USERNAME and OPENSEARCH_PASSWORD, or leave both empty for an anonymous cluster.'
+        ),
+        { status: 503 }
+      );
+    }
+
     console.log('Initializing OpenSearch client with nodes:');
+
     searchClient = new Client({
       nodes: config.searchNodes,
 
-      auth: config.searchUsername
+      auth: hasSearchUsername
         ? {
             username: config.searchUsername,
             password: config.searchPassword,
@@ -55,15 +63,17 @@ export function opensearch() {
         rejectUnauthorized: config.verifyTls,
       },
 
-      // Wazuh Indexer responses can take several seconds even for small requests.
-      // Use one bounded attempt so the backend can return the result or a clear error.
-      requestTimeout: 25000,
+      requestTimeout: config.opensearchRequestTimeoutMs,
       maxRetries: 0,
     });
   }
-  
+
   return searchClient;
 }
+
+// Named export for SIEM services.
+// This is a function, so call openSearchClient() to get the client.
+export const openSearchClient = opensearch;
 
 // ==================================================
 // WAZUH CONFIGURATION
@@ -99,11 +109,7 @@ async function authenticateWazuh(force = false) {
     );
   }
 
-  if (
-    !force &&
-    managerToken &&
-    Date.now() < tokenUntil
-  ) {
+  if (!force && managerToken && Date.now() < tokenUntil) {
     return managerToken;
   }
 
@@ -113,23 +119,22 @@ async function authenticateWazuh(force = false) {
 
   authenticationPromise = (async () => {
     try {
-      const credentials = Buffer.from(
-        `${config.managerUser}:${config.managerPassword}`
-      ).toString('base64');
-
       const response = await axios.post(
         managerUrl('/security/user/authenticate'),
         null,
         {
-          headers: {
-            Authorization: `Basic ${credentials}`,
+          auth: {
+            username: config.managerUser,
+            password: config.managerPassword,
           },
-          timeout: 10000,
+          timeout: config.wazuhRequestTimeoutMs,
           httpsAgent: wazuhHttpsAgent,
         }
       );
 
-      const token = response.data?.data?.token;
+      const token =
+        response.data?.data?.token ||
+        response.data?.token;
 
       if (!token) {
         throw new Error(
@@ -138,14 +143,12 @@ async function authenticateWazuh(force = false) {
       }
 
       managerToken = token;
-
       tokenUntil = Date.now() + TOKEN_REFRESH_MS;
 
       return token;
     } catch (error) {
       managerToken = null;
       tokenUntil = 0;
-
       throw error;
     } finally {
       authenticationPromise = null;
@@ -174,19 +177,24 @@ export async function wazuh(path, options = {}) {
   } = options;
 
   let token = await authenticateWazuh();
+
   const makeRequest = async (accessToken) => {
     const response = await axios({
       url: managerUrl(path),
       method,
       ...requestOptions,
-      timeout: 10000,
+      timeout: config.wazuhRequestTimeoutMs,
       httpsAgent: wazuhHttpsAgent,
       headers: {
         ...headers,
         Authorization: `Bearer ${accessToken}`,
       },
     });
-    console.log(`Wazuh response: ${response.status} ${response.statusText}`);
+
+    console.log(
+      `Wazuh response: ${response.status} ${response.statusText}`
+    );
+
     return response;
   };
 
@@ -194,15 +202,14 @@ export async function wazuh(path, options = {}) {
     return await makeRequest(token);
   } catch (error) {
     console.log(`Wazuh request error: ${error.message}`);
+
     if (error.response?.status !== 401) {
       throw error;
     }
 
-    // Token expired or invalid.
     managerToken = null;
     tokenUntil = 0;
 
-    // Authenticate again and retry exactly once.
     token = await authenticateWazuh(true);
 
     return makeRequest(token);
@@ -308,7 +315,7 @@ export async function integrationHealth() {
       if (!config.searchNodes?.length) return;
 
       try {
-        const response = await opensearch().cluster.health();
+        const response = await openSearchClient().cluster.health();
 
         const health = response.body;
 
@@ -367,5 +374,3 @@ export async function closeIntegrations() {
 
   wazuhHttpsAgent.destroy();
 }
-
-
