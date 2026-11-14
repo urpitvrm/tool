@@ -40,20 +40,6 @@ export async function listSavedSearches(userId) {
   return (await pool.query('SELECT * FROM saved_searches WHERE user_id=$1 ORDER BY name', [userId])).rows;
 }
 
-export async function listDashboards(userId) {
-  return (await pool.query('SELECT id,name,layout FROM saved_dashboards WHERE user_id=$1 ORDER BY name', [userId])).rows;
-}
-
-export async function createDashboard(userId, name, layout) {
-  const { rows } = await pool.query('INSERT INTO saved_dashboards(user_id,name,layout) VALUES($1,$2,$3) RETURNING *',
-    [userId, name, JSON.stringify(layout)]);
-  return rows[0];
-}
-
-export async function listReportHistory() {
-  return (await pool.query('SELECT id,configuration_id,status,created_at FROM report_history ORDER BY created_at DESC LIMIT 200')).rows;
-}
-
 export async function listNotificationRules() {
   return (await pool.query('SELECT id,name,condition,channel_id,enabled FROM notification_rules ORDER BY id')).rows;
 }

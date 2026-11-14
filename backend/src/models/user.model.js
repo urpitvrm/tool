@@ -65,3 +65,11 @@ export async function listPermissions() {
   const { rows } = await pool.query('SELECT key,description FROM permissions ORDER BY key');
   return rows;
 }
+
+export async function listRolePermissionKeys(roleId) {
+  const { rows } = await pool.query(
+    'SELECT p.key FROM role_permissions rp JOIN permissions p ON p.id=rp.permission_id WHERE rp.role_id=$1 ORDER BY p.key',
+    [roleId],
+  );
+  return rows.map((row) => row.key);
+}

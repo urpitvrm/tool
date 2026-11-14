@@ -4,6 +4,10 @@ import { config } from './index.js';
 
 const { Pool } = pg;
 
+// Return DATE columns as 'YYYY-MM-DD' strings. The default parser builds a Date at local
+// midnight, which shifts calendar dates (e.g. schedule start/end dates) across time zones.
+pg.types.setTypeParser(1082, (value) => value);
+
 const DATABASE_URL = config.databaseUrl;
 
 if (!DATABASE_URL) {
@@ -205,6 +209,9 @@ export async function migrate() {
       'indices:read',
       'indices:manage',
       'reports:read',
+      'reports:generate',
+      'reports:schedule',
+      'reports:manage',
       'admin:users',
       'admin:settings',
       'audit:read',
@@ -254,6 +261,8 @@ export async function migrate() {
           'events:read',
           'compliance:read',
           'reports:read',
+          'reports:generate',
+          'reports:schedule',
         ];
       } else if (role === 'Read Only Analyst') {
         perms = permissions.filter(p => p.endsWith(':read'));
@@ -265,7 +274,11 @@ export async function migrate() {
           'incidents:write',
           'agents:read',
           'reports:read',
+          'reports:generate',
+          'reports:schedule',
         ];
+        // SOC managers can see/manage every user's reports and schedules, use custom cron and CC/BCC.
+        if (role === 'SOC Manager') perms.push('reports:manage');
       }
 
       const { rows } = await client.query(

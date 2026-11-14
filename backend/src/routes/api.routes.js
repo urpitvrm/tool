@@ -9,8 +9,11 @@ const permission = requirePermission;
 const handle = (controller) => asyncHandler(controller);
 
 router.get('/dashboard', auth, permission('dashboard:read'), handle(apiController.dashboard));
+router.get('/events/export', auth, permission('events:read'), handle(apiController.exportEvents));
 router.get('/events', auth, permission('events:read'), handle(apiController.events));
 router.get('/agents', auth, permission('agents:read'), handle(apiController.agents));
+router.get('/agents/summary', auth, permission('agents:read'), handle(apiController.agentSummary));
+router.get('/agents/:id', auth, permission('agents:read'), handle(apiController.agentDetail));
 router.get('/agent-groups', auth, permission('agents:read'), handle(apiController.agentGroups));
 router.post('/agents/:id/operations', auth, permission('agents:manage'), handle(apiController.agentOperation));
 
@@ -39,7 +42,10 @@ router.post('/saved-searches', auth, permission('events:read'), handle(apiContro
 router.get('/saved-searches', auth, permission('events:read'), handle(apiController.savedSearches));
 router.get('/custom-dashboards', auth, permission('dashboard:read'), handle(apiController.dashboards));
 router.post('/custom-dashboards', auth, permission('dashboard:read'), handle(apiController.saveDashboard));
-router.get('/report-history', auth, permission('reports:read'), handle(apiController.reportHistory));
+router.get('/custom-dashboards/:id', auth, permission('dashboard:read'), handle(apiController.savedDashboard));
+router.put('/custom-dashboards/:id', auth, permission('dashboard:read'), handle(apiController.updateDashboard));
+router.delete('/custom-dashboards/:id', auth, permission('dashboard:read'), handle(apiController.deleteDashboard));
+// GET /report-history now lives in report.routes.js (same path and permission, paged and filterable).
 router.get('/notification-rules', auth, permission('admin:settings'), handle(apiController.notificationRules));
 router.post('/notification-rules', auth, permission('admin:settings'), handle(apiController.createNotificationRule));
 router.get('/active-response', auth, permission('agents:manage'), apiController.activeResponse);

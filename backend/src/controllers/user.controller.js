@@ -15,8 +15,9 @@ export async function login(req, res) {
   res.json(await userService.login(username, password));
 }
 
-export function me(req, res) {
-  res.json(req.user);
+export async function me(req, res) {
+  // Permissions let the UI hide actions the user cannot perform; the API still enforces them.
+  res.json({ ...req.user, permissions: await users.listRolePermissionKeys(req.user.role_id) });
 }
 
 export async function listUsers(_req, res) {

@@ -1,37 +1,134 @@
 import * as siemService from '../services/siem.service.js';
 import { config } from '../config/index.js';
+import { eventCsvHeader, eventCsvRow } from '../utils/csv.js';
 import { moduleIndexPatterns } from '../constants/index-patterns.js';
 import { validate } from '../validators/validate.js';
 import {
-  agentOperationSchema, dashboardSchema, incidentCommentSchema, incidentCreateSchema,
+  agentOperationSchema, dashboardSchema, dashboardUpdateSchema, eventFilterSchema, incidentCommentSchema, incidentCreateSchema,
   incidentStatusSchema, indexOperationSchema, notificationRuleSchema, savedSearchSchema,
 } from '../validators/api.validator.js';
+import { parseTimeRange } from '../utils/time-range.js';
 
 const bounded = (value, fallback, max) => Math.min(max, Math.max(1, Number(value || fallback)));
+const recordId = (value) => {
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 1) throw Object.assign(new Error('Invalid identifier'), { status: 422 });
+  return parsed;
+};
+
+/** Shared alert filters: from/to | minutes | hours, plus severity/agent/rule/IP filters (comma-separated). */
+function eventFilters(query) {
+  const filters = validate(eventFilterSchema, query);
+  return {
+    range: parseTimeRange({ from: filters.from, to: filters.to, minutes: filters.minutes, hours: query.hours ? bounded(query.hours, 24, 720) : undefined }),
+    q: filters.q,
+    severity: filters.severity,
+    agent: filters.agent,
+    ruleId: filters.rule_id,
+    srcip: filters.srcip,
+    dstip: filters.dstip,
+    source: filters.source,
+  };
+}
 
 export async function dashboard(req, res) {
-  res.json(await siemService.getDashboard(bounded(req.query.hours, 24, 720)));
+  const { range, source: _source, ...filters } = eventFilters(req.query);
+  res.json(await siemService.getDashboard(range, filters));
 }
 
 export async function events(req, res) {
-  const allowedSort = ['@timestamp', 'rule.level', 'agent.name', 'rule.id'];
-  const sort = allowedSort.includes(req.query.sort) ? req.query.sort : '@timestamp';
   res.json(await siemService.getEvents({
     page: bounded(req.query.page, 1, Number.MAX_SAFE_INTEGER),
     size: bounded(req.query.size, 50, 500),
-    hours: bounded(req.query.hours, 24, 720),
-    q: String(req.query.q || '').slice(0, 500),
-    sort,
+    sort: req.query.sort,
     order: req.query.order === 'asc' ? 'asc' : 'desc',
+    ...eventFilters(req.query),
   }));
 }
 
+async function writeCsvChunk(res, chunk) {
+  if (res.destroyed) return false;
+  if (res.write(chunk)) return true;
+  await new Promise((resolve) => {
+    const finish = () => {
+      res.off('drain', finish);
+      res.off('close', finish);
+      resolve();
+    };
+    res.once('drain', finish);
+    res.once('close', finish);
+  });
+  return !res.destroyed;
+}
+
+export async function exportEvents(req, res) {
+  const filters = eventFilters(req.query);
+  const iterator = siemService.scrollEvents({
+    ...filters,
+    sort: req.query.sort,
+    order: req.query.order === 'asc' ? 'asc' : 'desc',
+  });
+  let iteratorDone = false;
+  const nextBatch = async () => {
+    const result = await iterator.next();
+    iteratorDone = result.done;
+    return result;
+  };
+
+  try {
+    let batch = await nextBatch();
+    res.status(200);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="security-events-${filters.range.gte.slice(0, 10)}_${filters.range.lte.slice(0, 10)}.csv"`);
+    res.setHeader('Cache-Control', 'no-store');
+    await writeCsvChunk(res, `\uFEFF${eventCsvHeader}\r\n`);
+
+    while (!batch.done && !res.destroyed) {
+      for (const event of batch.value) {
+        if (!(await writeCsvChunk(res, `${eventCsvRow(event)}\r\n`))) break;
+      }
+      if (res.destroyed) break;
+      batch = await nextBatch();
+    }
+    if (!res.destroyed) res.end();
+  } catch (error) {
+    if (res.headersSent) res.destroy();
+    else throw error;
+  } finally {
+    if (!iteratorDone) await iterator.return().catch(() => {});
+  }
+}
+
+const AGENT_STATUSES = ['active', 'disconnected', 'never_connected', 'pending'];
+const agentParam = (value, pattern) => {
+  const text = String(value ?? '').trim();
+  return text && pattern.test(text) ? text : undefined;
+};
+
 export async function agents(req, res) {
+  const statuses = String(req.query.status || '').split(',').filter((status) => AGENT_STATUSES.includes(status));
   res.json(await siemService.getAgents({
     page: bounded(req.query.page, 1, Number.MAX_SAFE_INTEGER),
     size: bounded(req.query.size, 100, 500),
-    q: req.query.q,
+    // `q` keeps the Wazuh query-language passthrough; `exclude_manager` hides agent 000 (the manager).
+    q: req.query.exclude_manager === 'true' ? ['id!=000', req.query.q].filter(Boolean).join(';') : req.query.q,
+    search: agentParam(req.query.search, /^[\w .:@-]{1,120}$/),
+    status: statuses.join(',') || undefined,
+    group: agentParam(req.query.group, /^[\w.-]{1,120}$/),
+    platform: agentParam(req.query.platform, /^[\w.-]{1,60}$/),
+    sort: req.query.sort,
+    order: req.query.order === 'desc' ? 'desc' : 'asc',
   }));
+}
+
+export async function agentSummary(_req, res) {
+  res.json(await siemService.getAgentSummary());
+}
+
+export async function agentDetail(req, res) {
+  const id = String(req.params.id);
+  if (!/^\d{3,8}$/.test(id)) return res.status(422).json({ error: 'Invalid agent identifier' });
+  res.json(await siemService.getAgent(id));
 }
 
 export async function agentGroups(_req, res) {
@@ -126,13 +223,25 @@ export async function dashboards(req, res) {
   res.json(await siemService.getDashboards(req.user.id));
 }
 
-export async function saveDashboard(req, res) {
-  const body = validate(dashboardSchema, req.body);
-  res.status(201).json(await siemService.saveDashboard(req.user.id, body.name, body.layout));
+export async function savedDashboard(req, res) {
+  const dashboard = await siemService.getSavedDashboard(req.user.id, recordId(req.params.id));
+  if (!dashboard) return res.status(404).json({ error: 'Dashboard not found' });
+  res.json(dashboard);
 }
 
-export async function reportHistory(_req, res) {
-  res.json(await siemService.getReportHistory());
+export async function saveDashboard(req, res) {
+  const body = validate(dashboardSchema, req.body);
+  res.status(201).json(await siemService.saveDashboard(req.user.id, body, req.user));
+}
+
+export async function updateDashboard(req, res) {
+  const body = validate(dashboardUpdateSchema, req.body);
+  res.json(await siemService.updateDashboard(req.user.id, recordId(req.params.id), body, req.user));
+}
+
+export async function deleteDashboard(req, res) {
+  await siemService.deleteDashboard(req.user.id, recordId(req.params.id), req.user);
+  res.status(204).end();
 }
 
 export async function notificationRules(_req, res) {
