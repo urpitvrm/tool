@@ -237,6 +237,9 @@ export async function migrate() {
       'Threat Hunter',
       'Compliance Analyst',
       'Read Only Analyst',
+      'SOC Analyst',
+      'Auditor',
+      'Report Viewer',
     ];
 
     for (const role of roles) {
@@ -266,6 +269,12 @@ export async function migrate() {
         ];
       } else if (role === 'Read Only Analyst') {
         perms = permissions.filter(p => p.endsWith(':read'));
+      } else if (role === 'SOC Analyst') {
+        perms = ['dashboard:read', 'events:read', 'incidents:write', 'agents:read', 'reports:read'];
+      } else if (role === 'Auditor') {
+        perms = ['dashboard:read', 'events:read', 'agents:read', 'audit:read', 'compliance:read', 'reports:read'];
+      } else if (role === 'Report Viewer') {
+        perms = ['dashboard:read', 'reports:read'];
       } else {
         perms = [
           'dashboard:read',

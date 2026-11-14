@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Clock3, Database, X } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { api, apiError } from '../api.js';
+import { apiError } from '../api.js';
+import { useAuth } from '../auth/AuthContext.jsx';
 import { RANGE_PRESETS, toLocalInput } from '../lib/time.js';
 import { severityOf } from '../lib/format.js';
 
@@ -60,7 +60,8 @@ export function SeverityBadge({ level, severity }) {
 }
 
 const STATUS_TONES = {
-  active: 'ok', completed: 'ok', connected: 'ok', sent: 'ok',
+  active: 'ok', completed: 'ok', connected: 'ok', sent: 'ok', passed: 'ok', 'not applicable': 'muted',
+  deactivated: 'bad', invited: 'warn', pending_verification: 'warn', pending_approval: 'warn',
   disconnected: 'bad', failed: 'bad', email_failed: 'bad', never_connected: 'warn',
   paused: 'muted', expired: 'muted', pending: 'warn', queued: 'info', running: 'info', retrying: 'warn',
 };
@@ -246,8 +247,8 @@ export const useToast = () => useContext(ToastContext);
 
 // ---- Current user ------------------------------------------------------------------
 
+// Backed by AuthProvider; kept for existing callers.
 export function useCurrentUser() {
-  const query = useQuery({ queryKey: ['me'], queryFn: () => api.get('/auth/me').then((response) => response.data), staleTime: 300_000 });
-  const permissions = query.data?.permissions || [];
-  return { user: query.data, can: (key) => permissions.includes(key), loading: query.isLoading };
+  const { user, can, status } = useAuth();
+  return { user, can, loading: status === 'loading' };
 }

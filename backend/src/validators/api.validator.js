@@ -22,7 +22,11 @@ export const incidentStatusSchema = z.object({
 });
 
 export const incidentCommentSchema = z.object({ body: z.string().min(1).max(5000) });
-export const savedSearchSchema = z.object({ name: z.string().min(1).max(200), query: z.record(z.any()) });
+export const savedSearchSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  query: z.record(z.any()).refine((value) => JSON.stringify(value).length <= 20_000, 'Saved search is too large'),
+  module: z.string().regex(/^[a-z0-9_]{1,40}$/).default('events'),
+});
 export const DASHBOARD_WIDGET_TYPES = [
   'total_alerts', 'critical_alerts', 'high_alerts', 'medium_alerts', 'low_alerts', 'alert_trend', 'severity_distribution',
   'top_agents', 'top_rules', 'top_srcips', 'top_dstips', 'recent_alerts', 'agent_inventory', 'agent_status', 'event_trends',

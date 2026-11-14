@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>{{subject}}</title>
+</head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;color:#0f172a">
+<div style="display:none;max-height:0;overflow:hidden">{{preheader}}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:28px 12px">
+  <tr><td align="center">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden">
+      <tr><td style="background:#111a29;padding:20px 28px;border-bottom:3px solid #20a383">
+        <div style="font-size:11px;letter-spacing:1.5px;color:#94a3b8;text-transform:uppercase">Security Operations Platform</div>
+        <div style="font-size:20px;font-weight:bold;color:#ffffff;margin-top:4px">{{appName}}</div>
+      </td></tr>
+      <tr><td style="padding:28px;font-size:14px;line-height:1.6">
+        {{{content}}}
+      </td></tr>
+      <tr><td style="padding:16px 28px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:12px;line-height:1.5;color:#64748b">
+        <strong style="color:#475569">Security notice:</strong> {{appName}} will never ask for your password or verification code by email, phone or chat.
+        If you did not expect this message, do not click any links and contact your security team.
+        {{#supportContact}}<br>Support: {{supportContact}}{{/supportContact}}
+      </td></tr>
+    </table>
+    <div style="font-size:11px;color:#94a3b8;margin-top:14px">Automated message from {{appName}}. Please do not reply.</div>
+  </td></tr>
+</table>
+</body>
+</html>

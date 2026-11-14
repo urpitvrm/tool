@@ -28,16 +28,45 @@ export async function listAuditLogs(page, size) {
   return (await pool.query('SELECT * FROM audit_logs ORDER BY created_at DESC OFFSET $1 LIMIT $2', [(page - 1) * size, size])).rows;
 }
 
-export async function upsertSavedSearch(userId, name, query) {
+export async function upsertSavedSearch(userId, name, query, module = 'events') {
   const { rows } = await pool.query(
-    'INSERT INTO saved_searches(user_id,name,query) VALUES($1,$2,$3) ON CONFLICT(user_id,name) DO UPDATE SET query=EXCLUDED.query RETURNING *',
-    [userId, name, JSON.stringify(query)],
+    `INSERT INTO saved_searches(user_id,module,name,query) VALUES($1,$2,$3,$4)
+     ON CONFLICT(user_id,module,name) DO UPDATE SET query=EXCLUDED.query, updated_at=now() RETURNING *`,
+    [userId, module, name, JSON.stringify(query)],
   );
   return rows[0];
 }
 
-export async function listSavedSearches(userId) {
-  return (await pool.query('SELECT * FROM saved_searches WHERE user_id=$1 ORDER BY name', [userId])).rows;
+export async function listSavedSearches(userId, module) {
+  return (await pool.query(
+    'SELECT * FROM saved_searches WHERE user_id=$1 AND ($2::text IS NULL OR module=$2) ORDER BY name', [userId, module || null],
+  )).rows;
+}
+
+export async function deleteSavedSearch(userId, id) {
+  const { rowCount } = await pool.query('DELETE FROM saved_searches WHERE user_id=$1 AND id=$2', [userId, id]);
+  return rowCount > 0;
+}
+
+export async function getTablePreference(userId, module, tableKey) {
+  const { rows } = await pool.query(
+    'SELECT columns, page_size, updated_at FROM user_table_preferences WHERE user_id=$1 AND module=$2 AND table_key=$3', [userId, module, tableKey],
+  );
+  return rows[0] || null;
+}
+
+export async function saveTablePreference(userId, module, tableKey, columns, pageSize) {
+  const { rows } = await pool.query(
+    `INSERT INTO user_table_preferences(user_id, module, table_key, columns, page_size) VALUES($1,$2,$3,$4,$5)
+     ON CONFLICT(user_id, module, table_key) DO UPDATE SET columns=EXCLUDED.columns, page_size=EXCLUDED.page_size, updated_at=now()
+     RETURNING columns, page_size, updated_at`,
+    [userId, module, tableKey, JSON.stringify(columns), pageSize ?? null],
+  );
+  return rows[0];
+}
+
+export async function deleteTablePreference(userId, module, tableKey) {
+  await pool.query('DELETE FROM user_table_preferences WHERE user_id=$1 AND module=$2 AND table_key=$3', [userId, module, tableKey]);
 }
 
 export async function listNotificationRules() {

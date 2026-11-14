@@ -31,7 +31,15 @@ export function redactError(error) {
 
 export function errorHandler(error, _req, res, _next) {
   if (res.headersSent) return;
-  if (error.status) return res.status(error.status).json({ error: error.message });
+  if (error.status) {
+    if (error.retryAfter) res.setHeader('Retry-After', String(error.retryAfter));
+    return res.status(error.status).json({
+      error: error.message, ...(error.code ? { code: error.code } : {}),
+      ...(error.attemptsRemaining != null ? { attempts_remaining: error.attemptsRemaining } : {}),
+      ...(error.lockedUntil ? { locked_until: error.lockedUntil } : {}),
+      ...(error.retryAfter ? { retry_after: error.retryAfter } : {}),
+    });
+  }
   console.error('API request failed:', redactError(error));
   return res.status(503).json({ error: 'Integration or service unavailable', detail: redactError(error) });
 }

@@ -1,0 +1,9 @@
+<p style="margin:0 0 14px">Hello {{userName}},</p>
+<p style="margin:0 0 18px">{{inviterName}} has invited you to {{appName}} with the role <strong>{{roleName}}</strong>. Your username is <strong>{{username}}</strong>.</p>
+<p style="margin:0 0 22px">Open the secure link below to verify your email address and choose your password:</p>
+<p style="margin:0 0 22px;text-align:center">
+  <a href="{{link}}" style="display:inline-block;padding:12px 24px;background:#20a383;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:bold">Accept invitation</a>
+</p>
+<p style="margin:0 0 6px;font-size:13px">This link expires on <strong>{{expiresAt}}</strong> and works only once. No password is included in this email.</p>
+<p style="margin:0;font-size:12px;color:#64748b;word-break:break-all">If the button does not work, copy this address into your browser:<br>{{link}}</p>
+<p style="margin:18px 0 0;font-size:13px;color:#64748b">If you were not expecting this invitation, ignore this email and let your security team know.</p>

@@ -256,8 +256,9 @@ export async function getModuleData(module, index, { page, size, hours, q }) {
     items: result.body.hits.hits.map((hit) => ({ ...hit._source, _id: hit._id })) };
 }
 
-export const saveSearch = (userId, name, query) => siemModel.upsertSavedSearch(userId, name, query);
-export const getSavedSearches = (userId) => siemModel.listSavedSearches(userId);
+export const saveSearch = (userId, name, query, module) => siemModel.upsertSavedSearch(userId, name, query, module);
+export const getSavedSearches = (userId, module) => siemModel.listSavedSearches(userId, module);
+export const deleteSavedSearch = (userId, id) => siemModel.deleteSavedSearch(userId, id);
 export const getDashboards = (userId) => dashboardModel.listDashboards(userId);
 export const getSavedDashboard = (userId, id) => dashboardModel.findDashboard(userId, id);
 

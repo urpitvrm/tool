@@ -10,7 +10,11 @@ Requirements: Node.js 20+, PostgreSQL 14+, and access to any OpenSearch or Wazuh
 2. Create an empty PostgreSQL database using the configured database/user.
 3. In one terminal run `cd backend`, `npm install`, `npm run dev`.
 4. In another run `cd frontend`, `npm install`, `npm run dev`.
-5. Open `http://localhost:5173`. On first use, choose **First run? Create the initial admin**. The API permits bootstrap only while the users table is empty.
+5. Configure SMTP (`SMTP_*` in `.env`). Sign-in requires an emailed verification code; for local work you can use a mail catcher such as Mailpit.
+6. Create the first Super Administrator: `cd backend && npm run admin -- create-super-admin --username admin --email you@example.com --name "Your Name"`. Alternatively set `AUTH_SETUP_TOKEN` and use `/setup` in the browser.
+7. Open `http://localhost:5173`, sign in with your username or email and password, then enter the code sent to your email.
+
+Authentication, sessions, RBAC and the full auth API are documented in [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md).
 
 The browser uses `/api/v1` by default. Vite proxies `/api` to `http://localhost:8000` during local development. The OpenAPI route index is available at `http://localhost:8000/api/v1/openapi.json`; detailed setup notes and supported behavior are in this README.
 
@@ -33,7 +37,17 @@ PostgreSQL data is retained in the `postgres-data` volume. The frontend Nginx se
 
 | Variable | Purpose |
 |---|---|
-| `SECRET_KEY` | HS256 signing key; required for production |
+| `SECRET_KEY` | HS256 signing key and OTP HMAC key; required in production (at least 32 characters) |
+| `APP_NAME`, `SUPPORT_CONTACT` | Branding and support contact shown in emails (support contact can be overridden in Application Settings as `auth.support_contact`) |
+| `AUTH_SETUP_TOKEN` | One-time token that enables browser setup of the first Super Administrator; unset it afterwards |
+| `AUTH_ACCESS_TOKEN_MINUTES`, `AUTH_SESSION_HOURS`, `AUTH_REMEMBER_DAYS` | Access token lifetime (15), session lifetime (12 h), "keep me signed in" lifetime (30 days) |
+| `AUTH_OTP_MINUTES`, `AUTH_OTP_MAX_ATTEMPTS`, `AUTH_OTP_RESEND_SECONDS`, `AUTH_OTP_MAX_PER_15_MIN` | Code validity (5), attempts per code (5), resend cooldown (60 s), codes per account per 15 minutes (5) |
+| `AUTH_MAX_FAILED_LOGINS`, `AUTH_LOCK_MINUTES` | Lockout threshold (5) and duration (15 min) |
+| `AUTH_INVITATION_HOURS`, `AUTH_INVITE_REQUIRES_APPROVAL` | Invitation link lifetime (72 h); require administrator approval after acceptance (false) |
+| `AUTH_PASSWORD_HISTORY`, `AUTH_REVOKE_SESSIONS_ON_PASSWORD_CHANGE` | Passwords that cannot be reused (5); sign out other sessions on password change (true) |
+| `AUTH_NOTIFY_EVERY_LOGIN`, `AUTH_LOGIN_HISTORY_DAYS` | Email on every sign-in, not only unrecognized ones (false); login history retention (365) |
+| `AUTH_COOKIE_SECURE` | Mark cookies `Secure` (defaults to true when `APP_ENV=production`; requires HTTPS) |
+| `AUTH_LOGIN_OTP_ENABLED` | `false` skips the sign-in code, for local development without SMTP only |
 | `SUPABASE_URL` | Optional Supabase PostgreSQL connection URI; takes precedence over `DATABASE_URL` and uses verified TLS |
 | `DATABASE_URL` | Optional PostgreSQL connection string; otherwise `POSTGRESQL_*` variables are used |
 | `POSTGRESQL_HOST`, `POSTGRESQL_PORT`, `POSTGRESQL_DB`, `POSTGRESQL_USER`, `POSTGRESQL_PASSWORD` | PostgreSQL connection |
@@ -69,7 +83,7 @@ For Supabase, use the **PostgreSQL connection string** from the project's Databa
 
 All routes are under `/api/v1`.
 
-- `GET /health`, `POST /auth/register`, `POST /auth/login`, `GET /auth/me`
+- `GET /health`; authentication under `/auth/*` and user administration under `/users/*` (see [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md))
 - `GET /dashboard`, `GET /events` (server-side paging/search), `/agents`, `/agent-groups`
 - `/indices`, `/indices/:name/mappings`, `/cluster/health`
 - `GET /dashboard` accepts `minutes`, `hours`, or `from`/`to` (ISO-8601) plus the alert filters below, and returns severity bands, timeline, top agents/rules/IPs, rule-group trends and recent alerts in one OpenSearch request
@@ -85,11 +99,23 @@ All routes are under `/api/v1`.
 
 The module query endpoints use configurable/default Wazuh index patterns and return matching source documents only. Exact field mappings and supported Wazuh operations vary by installation. Destructive index/agent actions and provider-specific notification delivery have not been enabled.
 
+## Module workspaces (Dashboard and Search tabs)
+
+Security Events, Alerts, Agents, Vulnerability Detection, Compliance Overview, Security Configuration Assessment, File Integrity Monitoring, Authentication Monitoring, MITRE ATT&CK, Rootcheck, Malware Detection, and the PCI DSS, NIST 800-53, GDPR, HIPAA, CIS Controls and ISO 27001 pages each have two tabs:
+
+- **Dashboard:** KPI cards, a grid of module-specific charts (area, line, stacked bar, bar, horizontal bar, donut, pie), then a detailed table with column selection, sorting, paging, CSV/Excel export and record details. Clicking a chart element opens the matching records in Search.
+- **Search:** search bar (simple, or Advanced: Lucene syntax for OpenSearch modules, Wazuh query language for agents) with date range → common filters → Apply / Clear all / Save search / Export CSV → match count and the primary bar graph (Security Events: events by rule level; Alerts: severity; Agents: status; Vulnerabilities: severity; Compliance/SCA: control status; frameworks: control) → matching records table.
+
+Modules are declared in `backend/src/constants/modules.js` (fields, filters, KPIs, charts). Every view of a module is built by `backend/src/services/module.service.js` from one parsed filter set, so the count, charts, table and exports always describe the same records. Aggregations run in OpenSearch or the Wazuh API, never over a page of results in the browser. Agent connection trends come from Wazuh agent lifecycle alerts (rules 501–506), because the Manager API keeps no history.
+
+Sorting is server-side on any keyword, numeric, date, IP or boolean field. Columns can be shown, hidden, reordered, extended with any field in the index mapping, or reset; choices are stored per user, module and table in `user_table_preferences`. Saved searches are stored per module in `saved_searches.module`.
+
+API: `GET /modules`, `/modules/:module`, `/modules/:module/fields`, `/modules/:module/aggregations?scope=dashboard|search`, `/modules/:module/records`, `/modules/:module/values?field=`, `/modules/:module/export?format=csv|xlsx&columns=`, and `GET|PUT|DELETE /modules/:module/preferences/:table`. All accept the same filter parameters: `from`/`to`/`minutes`, `q`, `mode`, and the module's filter keys (for example `level_min`, `level_max`, `rule_id`, `agent_id`, `agent_name`, `srcip`, `dstip`, `event_type`, `protocol`).
+
 ## Dashboards, alerts, agents and reporting
 
 - **SOC Dashboard** (`/dashboard`, also `/custom-dashboards`): a customizable widget grid with 15 widgets (severity KPIs, alert trend, severity distribution, top agents/rules/source/destination IPs, recent alerts, agent inventory and connectivity, rule-group trends). Users can keep several dashboards, set a default, add and remove widgets, drag or move them, resize them (1–4 columns), and save the time range and auto-refresh with the layout. Configurations live in PostgreSQL (`saved_dashboards`, `dashboard_widgets`); alert data stays in OpenSearch. Clicking a chart element opens the matching alerts.
-- **Alerts** (`/alerts`): severity, agent, rule, source/destination IP and query filters, custom date ranges, sortable server-side paging (OpenSearch caps paging at 10,000 hits), a detail drawer with a structured summary and raw JSON, and CSV export of all matching alerts. **Security Events** (`/events`) keeps the free-text search page.
-- **Agent Inventory** (`/agents`): the Wazuh Manager API is the source of truth. Status cards, search, status/group/platform filters, sorting, paging and an agent detail drawer.
+- **Alerts, Security Events and Agents** use the module workspaces described above. OpenSearch caps paging at 10,000 hits; exports are not capped for CSV.
 - **Reports** (`/reports`): 15 report types (daily/weekly/monthly security, critical, high, security events, agent inventory, agent status, authentication, network, vulnerability, rule distribution, top attacking IPs, executive summary, custom) in PDF, Excel or CSV, with filters, column selection, relative or custom periods, time zone, and saved templates. Every generation is recorded in `report_history`, and files are written to `REPORT_STORAGE_DIR`.
 - **Report History** (`/report-history`): search and filter by type, status, format and (with `reports:manage`) user; download or delete.
 - **Report Scheduling** (`/report-schedules`): daily, weekly, monthly, or custom cron (requires `reports:manage`, minimum interval 15 minutes) in any IANA time zone, with start/end dates, recipients, optional CC/BCC (`reports:manage`), subject, message, and attachment or secure-link delivery. Shows next/last run, execution and email delivery history, and retry for failed generation or delivery.
@@ -117,7 +143,7 @@ Running several backend instances is safe. Set `SCHEDULER_ENABLED=false` on inst
 
 ## Data and access security
 
-- Argon2id password hashing, short-lived signed JWTs, rate-limited login, server-side permission checks, and a bootstrap-only initial admin flow.
+- Argon2id passwords with a strength policy and reuse prevention, mandatory email one-time codes, HttpOnly `SameSite=Strict` cookie sessions with rotating refresh tokens and immediate revocation, double-submit CSRF protection, account lockout, rate limits per IP and per account, multi-role RBAC enforced on every route, login history, and security notification emails. See [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md).
 - SQL parameters are bound; API inputs use Zod validation; request bodies are size limited.
 - Credentials remain in the API process. OpenSearch TLS verification is enabled by default; provide trusted CA certificates through the Node trust store when needed.
 - Audit records capture authentication, incident, account, and settings changes. Never forward raw upstream errors or credentials to logs.

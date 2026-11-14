@@ -3,6 +3,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY src ./src
+COPY scripts ./scripts
 COPY app.js server.js ./
 # Persistent report storage; mount a volume here (see docker-compose.yml).
 RUN mkdir -p /app/storage/reports && chown -R node:node /app/storage

@@ -2,7 +2,7 @@ import { SignJWT, jwtVerify } from 'jose';
 import { config } from '../config/index.js';
 import { audit } from '../config/db.js';
 import * as reportModel from '../models/report.model.js';
-import { hasPermission } from '../models/user.model.js';
+import { userHasPermission } from '../models/user.model.js';
 import { REPORT_TYPES, reportCatalog } from '../constants/report-types.js';
 import { buildReportDocument } from './report-data.service.js';
 import { FORMAT_META, renderReport } from '../utils/report-renderers/index.js';
@@ -17,7 +17,7 @@ const notFound = () => Object.assign(new Error('Report not found'), { status: 40
 
 export const getCatalog = () => reportCatalog();
 
-export const canManageReports = (user) => hasPermission(user.role_id, 'reports:manage');
+export const canManageReports = (user) => userHasPermission(user, 'reports:manage');
 
 /** Resolve the reporting window: explicit start/end, else a named period, else the type's default. */
 export function resolveReportRange({ reportType, start, end, period, timezone = 'UTC', now = new Date() }) {

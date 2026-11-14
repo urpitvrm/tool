@@ -40,6 +40,7 @@ for (const [module, permissionKey] of Object.entries(modulePermissions)) {
 
 router.post('/saved-searches', auth, permission('events:read'), handle(apiController.saveSearch));
 router.get('/saved-searches', auth, permission('events:read'), handle(apiController.savedSearches));
+router.delete('/saved-searches/:id', auth, permission('events:read'), handle(apiController.deleteSavedSearch));
 router.get('/custom-dashboards', auth, permission('dashboard:read'), handle(apiController.dashboards));
 router.post('/custom-dashboards', auth, permission('dashboard:read'), handle(apiController.saveDashboard));
 router.get('/custom-dashboards/:id', auth, permission('dashboard:read'), handle(apiController.savedDashboard));

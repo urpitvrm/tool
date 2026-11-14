@@ -212,11 +212,17 @@ export function moduleData(module) {
 
 export async function saveSearch(req, res) {
   const body = validate(savedSearchSchema, req.body);
-  res.status(201).json(await siemService.saveSearch(req.user.id, body.name, body.query));
+  res.status(201).json(await siemService.saveSearch(req.user.id, body.name, body.query, body.module));
 }
 
 export async function savedSearches(req, res) {
-  res.json(await siemService.getSavedSearches(req.user.id));
+  const module = /^[a-z0-9_]{1,40}$/.test(String(req.query.module || '')) ? String(req.query.module) : undefined;
+  res.json(await siemService.getSavedSearches(req.user.id, module));
+}
+
+export async function deleteSavedSearch(req, res) {
+  if (!(await siemService.deleteSavedSearch(req.user.id, recordId(req.params.id)))) return res.status(404).json({ error: 'Saved search not found' });
+  res.status(204).end();
 }
 
 export async function dashboards(req, res) {

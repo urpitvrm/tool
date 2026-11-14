@@ -6,7 +6,8 @@ import { agentOperationSchema, incidentCreateSchema, indexOperationSchema } from
 test('credentials retain the existing username and password constraints', () => {
   assert.equal(credentialsSchema.safeParse({ username: 'analyst', password: 'a-long-enough-secret' }).success, true);
   assert.equal(credentialsSchema.safeParse({ username: 'ab', password: 'short' }).success, false);
-  assert.equal(createUserSchema.safeParse({ username: 'analyst', password: 'a-long-enough-secret', role: 'Analyst' }).success, true);
+  // Users are now invited (no administrator-chosen password).
+  assert.equal(createUserSchema.safeParse({ full_name: 'An Analyst', email: 'analyst@example.com', username: 'analyst', role: 'Analyst' }).success, true);
 });
 
 test('agent and index operations require explicit confirmation', () => {

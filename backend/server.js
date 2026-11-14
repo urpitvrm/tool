@@ -2,6 +2,7 @@ import { config } from './src/config/index.js';
 import { pool, migrate } from './src/config/db.js';
 import { runMigrations } from './src/migrations/index.js';
 import { startReportScheduler, stopReportScheduler } from './src/schedulers/report.scheduler.js';
+import { startAuthCleanup, stopAuthCleanup } from './src/jobs/auth-cleanup.job.js';
 import app from './app.js';
 
 const server = app.listen(config.port, () => console.log(`SIEM API listening on ${config.port}`));
@@ -15,6 +16,7 @@ async function initializeDatabase() {
     await runMigrations();
     console.log('PostgreSQL schema is ready.');
     startReportScheduler();
+    startAuthCleanup();
   } catch (error) {
     console.error('Database initialization failed:', {
       message: error.message,
@@ -30,6 +32,7 @@ initializeDatabase();
 
 async function shutdown(signal) {
   console.log(`${signal} received, shutting down.`);
+  stopAuthCleanup();
   await stopReportScheduler();
   server.close(() => pool.end().finally(() => process.exit(0)));
   setTimeout(() => process.exit(1), 10_000).unref();

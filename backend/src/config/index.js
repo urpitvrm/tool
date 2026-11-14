@@ -59,6 +59,31 @@ export const config = {
     maxAttempts: positiveInteger(process.env.SCHEDULER_MAX_ATTEMPTS, 3),
     staleJobMinutes: positiveInteger(process.env.SCHEDULER_STALE_JOB_MINUTES, 30),
   },
+  auth: {
+    appName: process.env.APP_NAME || 'Sentinel SOC',
+    supportContact: process.env.SUPPORT_CONTACT || '',
+    accessTokenMinutes: positiveInteger(process.env.AUTH_ACCESS_TOKEN_MINUTES, 15),
+    sessionHours: positiveInteger(process.env.AUTH_SESSION_HOURS, 12),
+    rememberDays: positiveInteger(process.env.AUTH_REMEMBER_DAYS, 30),
+    otpMinutes: positiveInteger(process.env.AUTH_OTP_MINUTES, 5),
+    otpMaxAttempts: positiveInteger(process.env.AUTH_OTP_MAX_ATTEMPTS, 5),
+    otpResendSeconds: positiveInteger(process.env.AUTH_OTP_RESEND_SECONDS, 60),
+    otpMaxPerWindow: positiveInteger(process.env.AUTH_OTP_MAX_PER_15_MIN, 5),
+    // Login OTP is required. `false` is for local development without SMTP only.
+    loginOtpEnabled: process.env.AUTH_LOGIN_OTP_ENABLED !== 'false',
+    maxFailedLogins: positiveInteger(process.env.AUTH_MAX_FAILED_LOGINS, 5),
+    lockMinutes: positiveInteger(process.env.AUTH_LOCK_MINUTES, 15),
+    invitationHours: positiveInteger(process.env.AUTH_INVITATION_HOURS, 72),
+    inviteRequiresApproval: process.env.AUTH_INVITE_REQUIRES_APPROVAL === 'true',
+    resetGrantMinutes: positiveInteger(process.env.AUTH_RESET_GRANT_MINUTES, 10),
+    passwordHistory: positiveInteger(process.env.AUTH_PASSWORD_HISTORY, 5),
+    revokeOtherSessionsOnPasswordChange: process.env.AUTH_REVOKE_SESSIONS_ON_PASSWORD_CHANGE !== 'false',
+    notifyEveryLogin: process.env.AUTH_NOTIFY_EVERY_LOGIN === 'true',
+    loginHistoryDays: positiveInteger(process.env.AUTH_LOGIN_HISTORY_DAYS, 365),
+    // One-time token that enables browser-based first Super Admin setup (otherwise use the CLI).
+    setupToken: process.env.AUTH_SETUP_TOKEN || '',
+    cookieSecure: process.env.AUTH_COOKIE_SECURE ? process.env.AUTH_COOKIE_SECURE === 'true' : process.env.APP_ENV === 'production',
+  },
   smtp: {
     host: process.env.SMTP_HOST || '',
     port: positiveInteger(process.env.SMTP_PORT, 587),
@@ -71,3 +96,5 @@ export const config = {
 };
 if (!config.secret && config.environment === 'production') throw new Error('SECRET_KEY must be set in production');
 if (!config.secret) config.secret = 'local-development-only-change-this-secret';
+if (config.environment === 'production' && config.secret.length < 32) throw new Error('SECRET_KEY must be at least 32 characters in production');
+if (config.environment === 'production' && !config.auth.loginOtpEnabled) console.warn('WARNING: AUTH_LOGIN_OTP_ENABLED=false disables login OTP in production.');

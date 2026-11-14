@@ -1,0 +1,14 @@
+<p style="margin:0 0 14px">Hello {{userName}},</p>
+<p style="margin:0 0 18px">Use this code to finish signing in to {{appName}}:</p>
+<div style="text-align:center;margin:0 0 18px">
+  <div style="display:inline-block;padding:14px 26px;border:1px solid #cbd5e1;border-radius:8px;background:#f8fafc;font-family:'Courier New',monospace;font-size:32px;font-weight:bold;letter-spacing:10px;color:#0f172a">{{otp}}</div>
+</div>
+<p style="margin:0 0 6px">The code expires in <strong>{{expiresMinutes}} minutes</strong> and can be used once.</p>
+<table role="presentation" cellpadding="0" cellspacing="0" style="font-size:12px;color:#64748b;margin:14px 0 0">
+  <tr><td style="padding:2px 12px 2px 0">Requested from</td><td>{{device}}</td></tr>
+  <tr><td style="padding:2px 12px 2px 0">IP address</td><td>{{ip}}</td></tr>
+  <tr><td style="padding:2px 12px 2px 0">Time</td><td>{{time}}</td></tr>
+</table>
+<p style="margin:18px 0 0;padding:10px 12px;background:#fef2f2;border-left:3px solid #d03b3b;font-size:13px">
+  If you did not try to sign in, someone may know your password. Change it immediately and tell your security team. Never share this code.
+</p>

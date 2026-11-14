@@ -1,7 +1,7 @@
 import { config } from '../config/index.js';
 import * as scheduleModel from '../models/schedule.model.js';
 import * as reportModel from '../models/report.model.js';
-import { findActiveById, hasPermission } from '../models/user.model.js';
+import { findActiveById, userHasPermission } from '../models/user.model.js';
 import { createDownloadLink, emailReportSummary, generateReport, readReportBuffer, resolveReportRange } from '../services/report.service.js';
 import { assertAllowedRecipients, isTransientEmailError, sendReportEmail } from '../services/email.service.js';
 import { FORMAT_META } from '../utils/report-renderers/index.js';
@@ -18,7 +18,7 @@ async function scheduleOwner(schedule) {
   const owner = schedule.created_by ? await findActiveById(schedule.created_by) : null;
   if (!owner) throw permanent('The schedule owner no longer exists or is disabled');
   // Permissions are re-checked at run time so revoked access stops future deliveries.
-  if (!(await hasPermission(owner.role_id, 'reports:schedule'))) throw permanent('The schedule owner no longer has the reports:schedule permission');
+  if (!(await userHasPermission(owner.id, 'reports:schedule'))) throw permanent('The schedule owner no longer has the reports:schedule permission');
   return owner;
 }
 

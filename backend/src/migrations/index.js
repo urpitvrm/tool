@@ -1,8 +1,11 @@
 import { pool } from '../config/db.js';
 import m001 from './001_dashboards_reporting_scheduling.js';
+import m002 from './002_table_preferences_and_module_searches.js';
+import m003 from './003_authentication.js';
+import m004 from './004_login_history_device.js';
 
 // Ordered, append-only list. Never edit a migration that has shipped; add a new one instead.
-const migrations = [m001];
+const migrations = [m001, m002, m003, m004];
 
 // Arbitrary constant used for a cluster-wide advisory lock so that only one backend
 // instance applies migrations at a time.

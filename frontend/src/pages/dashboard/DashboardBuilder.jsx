@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ArrowRight, GripVertical, LayoutDashboard, Minus, Pencil, Plus, RefreshCw, Save, Star, Trash2, X } from 'lucide-react';
 import { api, apiError } from '../../api.js';
 import { Empty, ErrorState, Field, Modal, PageHeading, PanelTitle, TimeRangePicker, useToast } from '../../components/common.jsx';
-import { AlertDrawer } from '../AlertsPage.jsx';
+import { AlertDrawer } from '../../components/RecordDrawers.jsx';
 import { rangeLabel, rangeParams } from '../../lib/time.js';
 import { DEFAULT_WIDGETS, WIDGETS, WidgetBody } from './widgets.jsx';
 
@@ -63,7 +63,13 @@ export default function DashboardBuilder({ range: globalRange }) {
   const resize = (index, delta) => change(widgets.map((widget, i) => (i === index ? { ...widget, width: Math.min(4, Math.max(1, widget.width + delta)) } : widget)));
   const remove = (index) => change(widgets.filter((_, i) => i !== index));
 
-  const drill = (key, value) => navigate(`/alerts?${new URLSearchParams({ [key]: value })}`);
+  // Open the matching records in a module's Search tab.
+  const drill = (key, value) => {
+    if (key === 'severity') return navigate(`/alerts?${new URLSearchParams({ tab: 'search', severity: value })}`);
+    const param = { agent: 'agent_name', level: null }[key] ?? key;
+    const params = key === 'level' ? { level_min: value, level_max: value } : { [param]: value };
+    return navigate(`/events?${new URLSearchParams({ tab: 'search', ...params })}`);
+  };
   const layout = () => ({ range, refresh });
 
   async function save() {

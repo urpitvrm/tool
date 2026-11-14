@@ -108,3 +108,35 @@ export async function verifySmtp() {
   await transporter().verify();
   return true;
 }
+
+// ---- Templated mail (authentication and account notifications) -----------------------------
+
+const templateCache = new Map();
+const templateDir = new URL('../templates/', import.meta.url);
+
+async function loadTemplate(name) {
+  if (!templateCache.has(name)) {
+    const { readFile } = await import('node:fs/promises');
+    templateCache.set(name, await readFile(new URL(`${name}.html`, templateDir), 'utf8'));
+  }
+  return templateCache.get(name);
+}
+
+/** Minimal mustache-style rendering: {{value}} escaped, {{{value}}} raw, {{#key}}…{{/key}} conditional. */
+export function renderTemplateString(template, data) {
+  return template
+    .replace(/\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_match, key, inner) => (data[key] ? inner : ''))
+    .replace(/\{\{\{(\w+)\}\}\}/g, (_match, key) => String(data[key] ?? ''))
+    .replace(/\{\{(\w+)\}\}/g, (_match, key) => escapeHtml(data[key]));
+}
+
+export async function renderTemplate(name, data) {
+  const content = renderTemplateString(await loadTemplate(name), data);
+  return renderTemplateString(await loadTemplate('layout'), { ...data, content });
+}
+
+/** Send one HTML + text email. Throws on delivery failure; callers decide whether that is fatal. */
+export async function sendMail({ to, subject, html, text }) {
+  const info = await transporter().sendMail({ from: config.smtp.from, to, subject, html, text });
+  return info.messageId;
+}
